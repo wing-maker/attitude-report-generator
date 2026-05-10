@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.DS_Store
+.streamlit/secrets.toml
+*.log
+test_output.pptx
+test_output.pdf
+debug_test.pptx
+test_build.py
+template_v1*
+slide-*.jpg
+tslide-*.jpg
+preview-*.jpg
+logotest-*.jpg
