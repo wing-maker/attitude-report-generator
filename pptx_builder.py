@@ -695,7 +695,7 @@ def _fill_posting_slide(slide, item, *, header_title: str, client_logo_path: str
     # Replace text placeholders
     replace_text_in_slide(slide, {
         "{CREATOR_NAME}": creator,
-        "{POST_URL}": clean_url(post_url),
+        "{POST_URL}": "Posted Link" if clean_url(post_url) else "",
         "{LIKES}": fmt(likes),
         "{COMMENTS}": fmt(comments),
         "{VIEWS}": fmt(views),
