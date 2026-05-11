@@ -81,9 +81,9 @@ def get_query_param(name: str):
     return value
 
 
-def show_drive_upload_section(output_path: str, upload_name: str):
+def show_drive_upload_section(output_path: str, upload_name: str, metrics_path: str, metrics_name: str):
     st.markdown("**Save to Google Drive**")
-    st.caption("Upload the generated PPTX back into the same campaign folder.")
+    st.caption("Upload the generated PPTX and metrics Excel back into the same campaign folder.")
 
     oauth_config = get_google_oauth_config()
     if not oauth_config:
@@ -116,17 +116,26 @@ def show_drive_upload_section(output_path: str, upload_name: str):
             st.error(f"Could not start Google Drive login: {e}")
         return
 
-    if st.button("Upload PPTX to Same Drive Folder", use_container_width=True):
+    if st.button("Upload PPTX + Metrics Excel to Same Drive Folder", use_container_width=True):
         try:
             folder_id = drive_reader.extract_folder_id(st.session_state.folder_url)
-            uploaded = drive_uploader.upload_pptx_to_folder(
+            uploaded_ppt = drive_uploader.upload_file_to_folder(
                 credentials_info=st.session_state.drive_credentials,
                 folder_id=folder_id,
                 file_path=output_path,
                 file_name=upload_name,
+                mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
             )
-            st.success("Uploaded to Google Drive.")
-            st.markdown(f"[Open uploaded report]({uploaded['webViewLink']})")
+            uploaded_excel = drive_uploader.upload_file_to_folder(
+                credentials_info=st.session_state.drive_credentials,
+                folder_id=folder_id,
+                file_path=metrics_path,
+                file_name=metrics_name,
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            st.success("Uploaded PPTX and metrics Excel to Google Drive.")
+            st.markdown(f"[Open uploaded report]({uploaded_ppt['webViewLink']})")
+            st.markdown(f"[Open uploaded metrics Excel]({uploaded_excel['webViewLink']})")
         except Exception as e:
             st.error(f"Upload failed: {e}")
 
@@ -138,14 +147,16 @@ def show_metrics_excel_download(download_name: str):
     excel_path = os.path.join(st.session_state.work_dir, "editable_metrics.xlsx")
     excel_editor.export_metrics_excel(st.session_state.campaign_data, excel_path)
 
+    metrics_name = download_name.replace(".pptx", "_Metrics.xlsx")
     with open(excel_path, "rb") as f:
         st.download_button(
             "Download Editable Metrics Excel",
             data=f.read(),
-            file_name=download_name.replace(".pptx", "_Metrics.xlsx"),
+            file_name=metrics_name,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
+    return excel_path, metrics_name
 
 
 # =============================================================
@@ -476,9 +487,9 @@ if st.session_state.step == "build":
                 use_container_width=True,
             )
 
-        show_metrics_excel_download(download_name)
+        metrics_path, metrics_name = show_metrics_excel_download(download_name)
 
-        show_drive_upload_section(output_path, download_name)
+        show_drive_upload_section(output_path, download_name, metrics_path, metrics_name)
 
         st.divider()
 

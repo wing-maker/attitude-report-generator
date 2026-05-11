@@ -74,12 +74,13 @@ def credentials_from_info(info: dict):
     )
 
 
-def upload_pptx_to_folder(
+def upload_file_to_folder(
     *,
     credentials_info: dict,
     folder_id: str,
     file_path: str,
     file_name: str,
+    mimetype: str,
 ) -> dict:
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
@@ -93,7 +94,7 @@ def upload_pptx_to_folder(
     }
     media = MediaFileUpload(
         file_path,
-        mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        mimetype=mimetype,
         resumable=True,
     )
 
@@ -108,3 +109,19 @@ def upload_pptx_to_folder(
         .execute()
     )
     return uploaded
+
+
+def upload_pptx_to_folder(
+    *,
+    credentials_info: dict,
+    folder_id: str,
+    file_path: str,
+    file_name: str,
+) -> dict:
+    return upload_file_to_folder(
+        credentials_info=credentials_info,
+        folder_id=folder_id,
+        file_path=file_path,
+        file_name=file_name,
+        mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    )
