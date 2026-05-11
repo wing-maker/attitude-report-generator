@@ -30,9 +30,6 @@ from pptx.enum.text import PP_ALIGN
 from PIL import Image
 from lxml import etree
 
-from color_extractor import hex_to_rgb
-
-
 # =============================================================
 # Constants
 # =============================================================

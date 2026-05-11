@@ -258,8 +258,6 @@ def show_metrics_excel_download(download_name: str):
 # =============================================================
 # Session state init
 # =============================================================
-handle_google_drive_callback()
-
 if "step" not in st.session_state:
     st.session_state.step = "input"  # input -> processing -> review -> done
 if "campaign_data" not in st.session_state:
