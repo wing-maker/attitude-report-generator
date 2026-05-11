@@ -26,6 +26,7 @@ import re
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
 from PIL import Image
 from lxml import etree
 
@@ -274,6 +275,27 @@ def set_text_shape_hyperlink(slide, shape_name: str, url: str):
                     run.hyperlink.address = clean
         return True
     return False
+
+
+def align_text_shape_to_shape(slide, text_shape_name: str, anchor_shape_name: str):
+    """Align a text box with another shape's left and width."""
+    text_shape = None
+    anchor_shape = None
+    for shape in slide.shapes:
+        if shape.name == text_shape_name:
+            text_shape = shape
+        elif shape.name == anchor_shape_name:
+            anchor_shape = shape
+
+    if text_shape is None or anchor_shape is None:
+        return False
+
+    text_shape.left = anchor_shape.left
+    text_shape.width = anchor_shape.width
+    if text_shape.has_text_frame:
+        for para in text_shape.text_frame.paragraphs:
+            para.alignment = PP_ALIGN.CENTER
+    return True
 
 
 # =============================================================
@@ -680,6 +702,7 @@ def _fill_posting_slide(slide, item, *, header_title: str, client_logo_path: str
         "{SAVES}": fmt(saves),
         "{SHARES}": fmt(shares),
     })
+    align_text_shape_to_shape(slide, "ph_post_url", "ph_insight_image")
     set_text_shape_hyperlink(slide, "ph_post_url", post_url)
 
     # Replace post screenshot
