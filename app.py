@@ -16,6 +16,7 @@ import ocr_classifier
 import color_extractor
 import pptx_builder
 import drive_uploader
+import excel_editor
 
 
 # =============================================================
@@ -128,6 +129,23 @@ def show_drive_upload_section(output_path: str, upload_name: str):
             st.markdown(f"[Open uploaded report]({uploaded['webViewLink']})")
         except Exception as e:
             st.error(f"Upload failed: {e}")
+
+
+def show_metrics_excel_download(download_name: str):
+    st.markdown("**Review Metrics**")
+    st.caption("Download an Excel copy of the metrics for checking.")
+
+    excel_path = os.path.join(st.session_state.work_dir, "editable_metrics.xlsx")
+    excel_editor.export_metrics_excel(st.session_state.campaign_data, excel_path)
+
+    with open(excel_path, "rb") as f:
+        st.download_button(
+            "Download Editable Metrics Excel",
+            data=f.read(),
+            file_name=download_name.replace(".pptx", "_Metrics.xlsx"),
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
 
 
 # =============================================================
@@ -457,6 +475,8 @@ if st.session_state.step == "build":
                 type="primary",
                 use_container_width=True,
             )
+
+        show_metrics_excel_download(download_name)
 
         show_drive_upload_section(output_path, download_name)
 
