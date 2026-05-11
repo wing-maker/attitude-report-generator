@@ -16,7 +16,6 @@ import ocr_classifier
 import color_extractor
 import pptx_builder
 import drive_uploader
-import excel_editor
 
 
 # =============================================================
@@ -129,63 +128,6 @@ def show_drive_upload_section(output_path: str, upload_name: str):
             st.markdown(f"[Open uploaded report]({uploaded['webViewLink']})")
         except Exception as e:
             st.error(f"Upload failed: {e}")
-
-
-def show_excel_correction_section(output_path: str, download_name: str):
-    st.markdown("**Review / Correct Metrics**")
-    st.caption("Download Excel, edit any wrong numbers, then upload it to rebuild the PPT.")
-
-    excel_path = os.path.join(st.session_state.work_dir, "editable_metrics.xlsx")
-    excel_editor.export_metrics_excel(st.session_state.campaign_data, excel_path)
-
-    with open(excel_path, "rb") as f:
-        st.download_button(
-            "Download Editable Metrics Excel",
-            data=f.read(),
-            file_name=download_name.replace(".pptx", "_Metrics.xlsx"),
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
-
-    corrected_file = st.file_uploader(
-        "Upload corrected metrics Excel",
-        type=["xlsx"],
-        key="corrected_metrics_excel",
-    )
-    if corrected_file and st.button("Apply Excel Corrections & Rebuild PPT", use_container_width=True):
-        try:
-            st.session_state.campaign_data = excel_editor.apply_metrics_excel(
-                st.session_state.campaign_data,
-                corrected_file,
-            )
-            corrected_path = os.path.join(st.session_state.work_dir, "report_corrected.pptx")
-            pptx_builder.build_report(
-                template_path=TEMPLATE_PATH,
-                output_path=corrected_path,
-                campaign_name=st.session_state.campaign_name,
-                campaign_month=st.session_state.campaign_month,
-                client_logo_path=st.session_state.client_logo_path,
-                hero_image_path=st.session_state.hero_image_path,
-                header_color=st.session_state.header_color,
-                campaign_data=st.session_state.campaign_data,
-            )
-            st.session_state.corrected_output_path = corrected_path
-            st.success("Corrections applied. Download the corrected PPT below.")
-        except Exception as e:
-            st.error(f"Could not apply Excel corrections: {e}")
-
-    corrected_path = st.session_state.get("corrected_output_path")
-    if corrected_path and os.path.exists(corrected_path):
-        corrected_name = download_name.replace(".pptx", "_Corrected.pptx")
-        with open(corrected_path, "rb") as f:
-            st.download_button(
-                "Download Corrected Report",
-                data=f.read(),
-                file_name=corrected_name,
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                type="primary",
-                use_container_width=True,
-            )
 
 
 # =============================================================
@@ -515,8 +457,6 @@ if st.session_state.step == "build":
                 type="primary",
                 use_container_width=True,
             )
-
-        show_excel_correction_section(output_path, download_name)
 
         show_drive_upload_section(output_path, download_name)
 
