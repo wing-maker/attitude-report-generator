@@ -17,6 +17,7 @@ import color_extractor
 import pptx_builder
 import drive_uploader
 import excel_editor
+import apps_script_uploader
 
 
 # =============================================================
@@ -87,6 +88,22 @@ def get_google_service_account_config():
     return dict(config)
 
 
+def get_apps_script_upload_config():
+    """Read Apps Script upload endpoint settings from Streamlit secrets."""
+    try:
+        config = st.secrets.get("apps_script_upload", {})
+    except Exception:
+        return None
+
+    required = ("web_app_url", "token")
+    if not all(config.get(k) for k in required):
+        return None
+    return {
+        "web_app_url": config["web_app_url"],
+        "token": config["token"],
+    }
+
+
 def get_query_param(name: str):
     value = st.query_params.get(name)
     if isinstance(value, list):
@@ -120,6 +137,34 @@ def handle_google_drive_callback():
 def show_drive_upload_section(output_path: str, upload_name: str, metrics_path: str, metrics_name: str):
     st.markdown("**Save to Google Drive**")
     st.caption("Upload the generated PPTX and metrics Excel back into the same campaign folder.")
+
+    apps_script_config = get_apps_script_upload_config()
+    if apps_script_config:
+        if st.button("Upload PPTX + Metrics Excel to Same Drive Folder", use_container_width=True):
+            try:
+                folder_id = drive_reader.extract_folder_id(st.session_state.folder_url)
+                uploaded_ppt = apps_script_uploader.upload_file(
+                    web_app_url=apps_script_config["web_app_url"],
+                    token=apps_script_config["token"],
+                    folder_id=folder_id,
+                    file_path=output_path,
+                    file_name=upload_name,
+                    mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                )
+                uploaded_excel = apps_script_uploader.upload_file(
+                    web_app_url=apps_script_config["web_app_url"],
+                    token=apps_script_config["token"],
+                    folder_id=folder_id,
+                    file_path=metrics_path,
+                    file_name=metrics_name,
+                    mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+                st.success("Uploaded PPTX and metrics Excel to Google Drive.")
+                st.markdown(f"[Open uploaded report]({uploaded_ppt['webViewLink']})")
+                st.markdown(f"[Open uploaded metrics Excel]({uploaded_excel['webViewLink']})")
+            except Exception as e:
+                st.error(f"Upload failed: {e}")
+        return
 
     service_account_config = get_google_service_account_config()
     if service_account_config:
