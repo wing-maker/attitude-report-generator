@@ -22,7 +22,9 @@ Template slide indices (0-based):
 """
 
 import copy
+import os
 import re
+import tempfile
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
@@ -39,6 +41,8 @@ SLIDE_H_IN = 7.5
 # CHANGED: default to Watsons teal instead of generic green
 DEFAULT_HEADER_COLOR = (0, 160, 168)
 WHITE = RGBColor(255, 255, 255)
+MAX_IMAGE_LONG_EDGE = 1400
+JPEG_QUALITY = 78
 
 
 # =============================================================
@@ -57,6 +61,46 @@ def clean_url(text: str) -> str:
     if m:
         return m.group(1).rstrip(',.;:!?)')
     return text.strip()
+
+
+def prepare_image_for_ppt(image_path: str) -> str:
+    """
+    Compress screenshot-like images before inserting them into PPT.
+    Keeps transparent PNGs unchanged so client logos stay clean.
+    """
+    if not image_path or not os.path.exists(image_path):
+        return image_path
+
+    try:
+        with Image.open(image_path) as img:
+            has_alpha = img.mode in ("RGBA", "LA") or (
+                img.mode == "P" and "transparency" in img.info
+            )
+            if has_alpha:
+                return image_path
+
+            img = img.convert("RGB")
+            w, h = img.size
+            long_edge = max(w, h)
+
+            if long_edge > MAX_IMAGE_LONG_EDGE:
+                scale = MAX_IMAGE_LONG_EDGE / long_edge
+                new_size = (max(1, int(w * scale)), max(1, int(h * scale)))
+                img = img.resize(new_size, Image.Resampling.LANCZOS)
+
+            fd, out_path = tempfile.mkstemp(prefix="ppt_img_", suffix=".jpg")
+            os.close(fd)
+            img.save(out_path, format="JPEG", quality=JPEG_QUALITY, optimize=True)
+
+        if os.path.getsize(out_path) < os.path.getsize(image_path):
+            return out_path
+        try:
+            os.remove(out_path)
+        except OSError:
+            pass
+        return image_path
+    except Exception:
+        return image_path
 
 # Template slide index constants
 IDX_COVER = 0
@@ -207,6 +251,7 @@ def replace_shape_with_image(slide, shape_name: str, image_path: str, *,
         return False
 
     try:
+        image_path = prepare_image_for_ppt(image_path)
         if keep_aspect_ratio:
             # Calculate aspect-fit dimensions
             with Image.open(image_path) as img:
