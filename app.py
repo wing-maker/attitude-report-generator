@@ -81,6 +81,29 @@ def get_query_param(name: str):
     return value
 
 
+def handle_google_drive_callback():
+    """Handle Google OAuth redirect no matter which app step is showing."""
+    code = get_query_param("code")
+    if not code or "drive_credentials" in st.session_state:
+        return
+
+    oauth_config = get_google_oauth_config()
+    if not oauth_config:
+        return
+
+    try:
+        st.session_state.drive_credentials = drive_uploader.exchange_code_for_credentials(
+            client_id=oauth_config["client_id"],
+            client_secret=oauth_config["client_secret"],
+            redirect_uri=oauth_config["redirect_uri"],
+            code=code,
+        )
+        st.session_state.drive_connected_message = "Google Drive connected."
+        st.query_params.clear()
+    except Exception as e:
+        st.session_state.drive_connection_error = f"Could not connect Google Drive: {e}"
+
+
 def show_drive_upload_section(output_path: str, upload_name: str, metrics_path: str, metrics_name: str):
     st.markdown("**Save to Google Drive**")
     st.caption("Upload the generated PPTX and metrics Excel back into the same campaign folder.")
@@ -93,19 +116,6 @@ def show_drive_upload_section(output_path: str, upload_name: str, metrics_path: 
             "`google_oauth.redirect_uri` in Streamlit secrets."
         )
         return
-
-    code = get_query_param("code")
-    if code and "drive_credentials" not in st.session_state:
-        try:
-            st.session_state.drive_credentials = drive_uploader.exchange_code_for_credentials(
-                client_id=oauth_config["client_id"],
-                client_secret=oauth_config["client_secret"],
-                redirect_uri=oauth_config["redirect_uri"],
-                code=code,
-            )
-            st.success("Google Drive connected.")
-        except Exception as e:
-            st.error(f"Could not connect Google Drive: {e}")
 
     if "drive_credentials" not in st.session_state:
         try:
@@ -162,6 +172,8 @@ def show_metrics_excel_download(download_name: str):
 # =============================================================
 # Session state init
 # =============================================================
+handle_google_drive_callback()
+
 if "step" not in st.session_state:
     st.session_state.step = "input"  # input -> processing -> review -> done
 if "campaign_data" not in st.session_state:
@@ -195,6 +207,11 @@ with st.sidebar:
 # =============================================================
 st.title("📊 Campaign Report Generator")
 st.caption("Generate a posting report from a Google Drive folder in 30 seconds.")
+
+if st.session_state.get("drive_connected_message"):
+    st.success(st.session_state.pop("drive_connected_message"))
+if st.session_state.get("drive_connection_error"):
+    st.error(st.session_state.pop("drive_connection_error"))
 
 
 # =============================================================
