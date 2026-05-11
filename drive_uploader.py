@@ -74,6 +74,15 @@ def credentials_from_info(info: dict):
     )
 
 
+def service_account_credentials_from_info(info: dict):
+    from google.oauth2 import service_account
+
+    return service_account.Credentials.from_service_account_info(
+        info,
+        scopes=SCOPES,
+    )
+
+
 def upload_file_to_folder(
     *,
     credentials_info: dict,
@@ -81,11 +90,15 @@ def upload_file_to_folder(
     file_path: str,
     file_name: str,
     mimetype: str,
+    use_service_account: bool = False,
 ) -> dict:
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
 
-    creds = credentials_from_info(credentials_info)
+    if use_service_account:
+        creds = service_account_credentials_from_info(credentials_info)
+    else:
+        creds = credentials_from_info(credentials_info)
     service = build("drive", "v3", credentials=creds)
 
     metadata = {
