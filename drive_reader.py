@@ -189,11 +189,18 @@ def find_platform_subfolders(root_folder_id: str):
     Matching is case-insensitive on folder name.
     """
     items = list_folder_contents(root_folder_id)
-    result = {"xhs": None, "tiktok": None, "warnings": []}
+    result = {"xhs": None, "tiktok": None, "xhs_sheet": None, "tiktok_sheet": None, "warnings": []}
 
     for it in items:
         name_lower = it["name"].lower()
         if "xhs" not in name_lower and "rednote" not in name_lower and "tiktok" not in name_lower and "tt" != name_lower:
+            continue
+
+        if it["type"] == "sheet":
+            if "xhs" in name_lower or "rednote" in name_lower:
+                result["xhs_sheet"] = it["id"]
+            if "tiktok" in name_lower or "tt" == name_lower:
+                result["tiktok_sheet"] = it["id"]
             continue
 
         folder_id, warning = resolve_platform_folder_item(it)
@@ -347,8 +354,8 @@ def fetch_campaign_data(folder_url: str):
     result["errors"].extend(subfolders.get("warnings", []))
 
     # XHS
-    if subfolders["xhs"]:
-        sheet_id = find_response_sheet_id(subfolders["xhs"])
+    if subfolders["xhs_sheet"] or subfolders["xhs"]:
+        sheet_id = subfolders["xhs_sheet"] or find_response_sheet_id(subfolders["xhs"])
         if sheet_id:
             try:
                 df = read_sheet_as_dataframe(sheet_id)
@@ -364,8 +371,8 @@ def fetch_campaign_data(folder_url: str):
         result["errors"].append("XHS subfolder not found")
 
     # TikTok
-    if subfolders["tiktok"]:
-        sheet_id = find_response_sheet_id(subfolders["tiktok"])
+    if subfolders["tiktok_sheet"] or subfolders["tiktok"]:
+        sheet_id = subfolders["tiktok_sheet"] or find_response_sheet_id(subfolders["tiktok"])
         if sheet_id:
             try:
                 df = read_sheet_as_dataframe(sheet_id)
