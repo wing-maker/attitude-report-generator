@@ -94,6 +94,10 @@ def list_folder_contents(folder_id: str):
         r'<div class="flip-entry-title"[^>]*>([^<]+)</div>',
         re.DOTALL
     )
+    any_anchor_pattern = re.compile(
+        r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
+        re.DOTALL
+    )
 
     def extract_title(inner_html: str) -> str:
         """Extract the flip-entry-title text from inside an <a> tag's inner HTML."""
@@ -103,6 +107,24 @@ def list_folder_contents(folder_id: str):
         # Fallback: strip HTML tags and take any leftover text
         clean = re.sub(r'<[^>]+>', '', inner_html).strip()
         return clean
+
+    def item_from_href(href: str, title: str):
+        item_id = extract_file_id(href)
+        if not item_id:
+            return None
+
+        is_folder = "/drive/folders/" in href or "folderview?id=" in href
+        item_type = "folder" if is_folder else "file"
+        if "/spreadsheets/d/" in href:
+            item_type = "sheet"
+
+        return {
+            "id": item_id,
+            "name": title,
+            "is_folder": is_folder,
+            "type": item_type,
+            "href": href,
+        }
 
     for m in folder_anchor_pattern.finditer(html):
         href = m.group(1)
@@ -127,6 +149,15 @@ def list_folder_contents(folder_id: str):
         title = extract_title(inner)
         if title:
             items.append({"id": sheet_id, "name": title, "is_folder": False, "type": "sheet", "href": href})
+
+    for m in any_anchor_pattern.finditer(html):
+        href = m.group(1)
+        inner = m.group(2)
+        title = extract_title(inner)
+        if title:
+            item = item_from_href(href, title)
+            if item:
+                items.append(item)
 
     # Deduplicate (same id might appear multiple times if there are nested anchors)
     seen = set()
