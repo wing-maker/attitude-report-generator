@@ -168,6 +168,18 @@ def resolve_shortcut_folder_id(file_id: str) -> str | None:
     return None
 
 
+def resolve_platform_folder_item(item: dict) -> tuple[str | None, str | None]:
+    """Return (folder_id, warning) for a folder or folder shortcut listing item."""
+    if item["is_folder"]:
+        return item["id"], None
+
+    folder_id = resolve_shortcut_folder_id(item["id"])
+    if folder_id:
+        return folder_id, None
+
+    return None, f"Could not open response shortcut: {item['name']}"
+
+
 # =============================================================
 # Find platform subfolders (XHS / TIKTOK)
 # =============================================================
@@ -177,16 +189,16 @@ def find_platform_subfolders(root_folder_id: str):
     Matching is case-insensitive on folder name.
     """
     items = list_folder_contents(root_folder_id)
-    result = {"xhs": None, "tiktok": None}
+    result = {"xhs": None, "tiktok": None, "warnings": []}
 
     for it in items:
         name_lower = it["name"].lower()
-        folder_id = it["id"] if it["is_folder"] else None
+        if "xhs" not in name_lower and "rednote" not in name_lower and "tiktok" not in name_lower and "tt" != name_lower:
+            continue
 
-        if not folder_id and ("responses" in name_lower or "shortcut" in name_lower):
-            folder_id = resolve_shortcut_folder_id(it["id"])
-
-        if not folder_id:
+        folder_id, warning = resolve_platform_folder_item(it)
+        if warning:
+            result["warnings"].append(warning)
             continue
         if "xhs" in name_lower or "rednote" in name_lower or "小红书" in it["name"]:
             result["xhs"] = folder_id
@@ -332,6 +344,7 @@ def fetch_campaign_data(folder_url: str):
     subfolders = find_platform_subfolders(folder_id)
 
     result = {"xhs_kocs": [], "tiktok_kols": [], "errors": []}
+    result["errors"].extend(subfolders.get("warnings", []))
 
     # XHS
     if subfolders["xhs"]:
