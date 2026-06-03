@@ -78,15 +78,15 @@ def list_folder_contents(folder_id: str):
 
     # Folders: extract id + title separately
     folder_anchor_pattern = re.compile(
-        r'<a[^>]+href="[^"]*?/drive/folders/([a-zA-Z0-9_-]+)[^"]*"[^>]*>(.*?)</a>',
+        r'<a[^>]+href="([^"]*?/drive/folders/([a-zA-Z0-9_-]+)[^"]*)"[^>]*>(.*?)</a>',
         re.DOTALL
     )
     file_anchor_pattern = re.compile(
-        r'<a[^>]+href="[^"]*?/file/d/([a-zA-Z0-9_-]+)[^"]*"[^>]*>(.*?)</a>',
+        r'<a[^>]+href="([^"]*?/file/d/([a-zA-Z0-9_-]+)[^"]*)"[^>]*>(.*?)</a>',
         re.DOTALL
     )
     sheet_anchor_pattern = re.compile(
-        r'<a[^>]+href="[^"]*?/spreadsheets/d/([a-zA-Z0-9_-]+)[^"]*"[^>]*>(.*?)</a>',
+        r'<a[^>]+href="([^"]*?/spreadsheets/d/([a-zA-Z0-9_-]+)[^"]*)"[^>]*>(.*?)</a>',
         re.DOTALL
     )
 
@@ -105,25 +105,28 @@ def list_folder_contents(folder_id: str):
         return clean
 
     for m in folder_anchor_pattern.finditer(html):
-        folder_id = m.group(1)
-        inner = m.group(2)
+        href = m.group(1)
+        folder_id = m.group(2)
+        inner = m.group(3)
         title = extract_title(inner)
         if title:
-            items.append({"id": folder_id, "name": title, "is_folder": True, "type": "folder"})
+            items.append({"id": folder_id, "name": title, "is_folder": True, "type": "folder", "href": href})
 
     for m in file_anchor_pattern.finditer(html):
-        file_id = m.group(1)
-        inner = m.group(2)
+        href = m.group(1)
+        file_id = m.group(2)
+        inner = m.group(3)
         title = extract_title(inner)
         if title:
-            items.append({"id": file_id, "name": title, "is_folder": False, "type": "file"})
+            items.append({"id": file_id, "name": title, "is_folder": False, "type": "file", "href": href})
 
     for m in sheet_anchor_pattern.finditer(html):
-        sheet_id = m.group(1)
-        inner = m.group(2)
+        href = m.group(1)
+        sheet_id = m.group(2)
+        inner = m.group(3)
         title = extract_title(inner)
         if title:
-            items.append({"id": sheet_id, "name": title, "is_folder": False, "type": "sheet"})
+            items.append({"id": sheet_id, "name": title, "is_folder": False, "type": "sheet", "href": href})
 
     # Deduplicate (same id might appear multiple times if there are nested anchors)
     seen = set()
@@ -134,6 +137,35 @@ def list_folder_contents(folder_id: str):
             unique.append(it)
 
     return unique
+
+
+def resolve_shortcut_folder_id(file_id: str) -> str | None:
+    """
+    Best-effort resolver for public Google Drive folder shortcuts.
+    Embedded folder view can list shortcuts as files, while the public shortcut
+    page often redirects to or contains the target /drive/folders/<id> URL.
+    """
+    urls = [
+        f"https://drive.google.com/file/d/{file_id}/view",
+        f"https://drive.google.com/open?id={file_id}",
+    ]
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    for url in urls:
+        try:
+            r = requests.get(url, timeout=15, headers=headers, allow_redirects=True)
+        except requests.RequestException:
+            continue
+
+        final_match = re.search(r"/drive/folders/([a-zA-Z0-9_-]+)", r.url)
+        if final_match:
+            return final_match.group(1)
+
+        body_match = re.search(r"/drive/folders/([a-zA-Z0-9_-]+)", r.text)
+        if body_match:
+            return body_match.group(1)
+
+    return None
 
 
 # =============================================================
@@ -148,13 +180,18 @@ def find_platform_subfolders(root_folder_id: str):
     result = {"xhs": None, "tiktok": None}
 
     for it in items:
-        if not it["is_folder"]:
-            continue
         name_lower = it["name"].lower()
+        folder_id = it["id"] if it["is_folder"] else None
+
+        if not folder_id and ("responses" in name_lower or "shortcut" in name_lower):
+            folder_id = resolve_shortcut_folder_id(it["id"])
+
+        if not folder_id:
+            continue
         if "xhs" in name_lower or "rednote" in name_lower or "小红书" in it["name"]:
-            result["xhs"] = it["id"]
+            result["xhs"] = folder_id
         if "tiktok" in name_lower or "tt" == name_lower:
-            result["tiktok"] = it["id"]
+            result["tiktok"] = folder_id
 
     return result
 
